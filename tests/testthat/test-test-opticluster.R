@@ -1,16 +1,15 @@
-test_that("opti cluster returns four dataframes", {
+test_that("opticluster returns four dataframes", {
   cutoff <- 0.2
   count_table <- read_count(test_path("extdata", "amazon.count_table"))
   distance_data <- read_dist(test_path("extdata", "amazon_column.dist"),
                              count_table, cutoff, FALSE)
-  df <- cluster(distance_data, method = "opti")
+  df <- cluster(distance_data, method = "opticlust")
   csv <- read.csv(test_path("extdata", "abundance_results_opticluster.csv"))
-  df$abundance$label <- as.numeric(df$abundance$label)
   expect_equal(class(df$cluster), "data.frame")
   expect_equal(class(df$cluster_metrics), "data.frame")
-  expect_equal(class(df$other_cluster_metrics), "data.frame")
+  expect_equal(class(df$iteration_metrics), "data.frame")
   expect_equal(class(df$abundance), "data.frame")
-  expect_true(all(csv == df$abundance))
+  expect_true(all(csv$label == df$label))
 })
 
 test_that("other clustering methods only return two dataframes", {
@@ -37,6 +36,15 @@ test_that("other clustering methods only return two dataframes", {
   expect_equal(class(df_weighted$abundance), "data.frame")
 })
 
+test_that("Clustering fails when arguments are incorrect", {
+  cutoff <- 0.2
+  count_table <- read_count(test_path("extdata", "amazon.count_table"))
+  distance_data <- read_dist(test_path("extdata", "amazon_column.dist"),
+                             count_table, cutoff, FALSE)
+  expect_error(cluster(distance_data, "neighbor"))
+  expect_error(cluster(cutoff, "opticlust"))
+})
+
 test_that("Opticluster works with phylip files", {
 
   cutoff <- 0.2
@@ -44,12 +52,19 @@ test_that("Opticluster works with phylip files", {
   distance_data <- read_dist(test_path("extdata", "amazon_phylip.dist"),
                              count_table, cutoff, FALSE)
 
-  df_opti <- cluster(distance_data, method = "opti")
+  df_opti <- cluster(distance_data, method = "opticlust")
 
   expect_true(nrow(df_opti$cluster) == 29 && nrow(df_opti$abundance == 29))
-  expect_true(length(df_opti) == 4)
+  expect_true(length(df_opti) == 5)
 
 })
+
+test_that("Example Path returns the correct path", {
+  expect_true(class(example_path("amazon_phylip.dist")) == "character")
+  expect_error(example_path("a"))
+  expect_true(length(example_path()) == 4)
+})
+
 test_that("cluster works via phylip file", {
 
   cutoff <- 0.2
@@ -79,7 +94,7 @@ test_that("Opticluster works with column files", {
   distance_data <- read_dist(test_path("extdata", "amazon_column.dist"),
                              count_table, cutoff, FALSE)
 
-  df_opti <- cluster(distance_data, method = "opti")
+  df_opti <- cluster(distance_data, method = "opticlust")
 
 
   expect_true(nrow(df_opti$cluster) == 31 && nrow(df_opti$abundance == 31))
@@ -114,7 +129,7 @@ test_that("Amazon Data from mothur clusters properly", {
   count_table <- read_count(test_path("extdata", "amazon.count_table"))
   distance_data <- read_dist(test_path("extdata", "amazon_column.dist"),
                              count_table, 0.2, FALSE)
-  data <- cluster(distance_data, method = "opti")
+  data <- cluster(distance_data, method = "opticlust")
   expect_true(nrow(data$cluster) == nrow(result$cluster))
 })
 
@@ -133,14 +148,24 @@ test_that("Read count can read sparse and normal count tables", {
   expect_true(ncol(sparse_count_table) == 12)
 })
 
-test_that("Read dist can read column and phylip files", {
+test_that("Read dist can read column, phylip files, and sparse matrices", {
+  set.seed(123)
   count_table <- read_count(test_path("extdata", "amazon.count_table"))
   distance_data_column <- read_dist(test_path("extdata", "amazon_column.dist"),
                                     count_table, 0.2, FALSE)
   distance_data_phylip <- read_dist(test_path("extdata", "amazon_phylip.dist"),
                                     count_table, 0.2, FALSE)
-  expect_true(nrow(get_distance_data_frame(distance_data_column)) == 9604)
-  expect_true(nrow(get_distance_data_frame(distance_data_phylip)) == 9604)
+  i_values <- as.integer(1:100)
+  j_values <- as.integer(sample(1:100, 100, TRUE))
+  x_values <- as.numeric(runif(100, 0, 1))
+  s_matrix <- create_sparse_matrix(i_values, j_values, x_values)
+  sparse_count <- data.frame(Representative_Sequence = 1:100,
+                             total = rep(1, times = 100))
+  distance_data_sparse <- read_dist(s_matrix, sparse_count, 0.2, FALSE)
+  expect_error(read_dist("", count_table, 0.2, FALSE))
+  expect_true(nrow(get_distance_df(distance_data_column)) == 962)
+  expect_true(nrow(get_distance_df(distance_data_phylip)) == 1048)
+  expect_true(nrow(get_distance_df(distance_data_sparse)) == 9827)
 })
 
 
